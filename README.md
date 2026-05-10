@@ -26,7 +26,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/python-≥3.10-blue?logo=python&logoColor=white" alt="Python">
-  <img src="https://img.shields.io/badge/agents-OpenClaw_%7C_Claude_Code_%7C_Codex_%7C_nanobot-blueviolet" alt="Agents">
+  <img src="https://img.shields.io/badge/agents-OpenClaw_%7C_Claude_Code_%7C_Codex_%7C_Hermes_%7C_nanobot-blueviolet" alt="Agents">
   <img src="https://img.shields.io/badge/transport-File_%7C_ZeroMQ_P2P-orange" alt="Transport">
   <img src="https://img.shields.io/badge/version-0.3.0-teal" alt="Version">
 </p>
@@ -35,7 +35,7 @@
 
 You set the goal. The agent swarm handles the rest — spawning workers, splitting tasks, coordinating, and merging results.
 
-Works with [OpenClaw](https://openclaw.ai) (default), [Claude Code](https://claude.ai/claude-code), [Codex](https://openai.com/codex), [nanobot](https://github.com/HKUDS/nanobot), [Cursor](https://cursor.com), and any CLI agent.
+Works with [OpenClaw](https://openclaw.ai) (default), [Claude Code](https://claude.ai/claude-code), [Codex](https://openai.com/codex), [Hermes Agent](https://github.com/NousResearch/hermes-agent), [nanobot](https://github.com/HKUDS/nanobot), [Cursor](https://cursor.com), and any CLI agent.
 
 ## Platform Support
 
@@ -141,6 +141,7 @@ clawteam board attach my-team   # Linux/macOS/WSL with tmux
 | [Claude Code](https://claude.ai/claude-code) | `clawteam spawn claude --team ...` | Full support |
 | [Codex](https://openai.com/codex) | `clawteam spawn codex --team ...` | Full support |
 | [nanobot](https://github.com/HKUDS/nanobot) | `clawteam spawn nanobot --team ...` | Full support |
+| [Hermes Agent](https://github.com/NousResearch/hermes-agent) | `clawteam spawn hermes --team ...` | Full support (tmux + subprocess) |
 | [Cursor](https://cursor.com) | `clawteam spawn subprocess cursor --team ...` | Experimental |
 | Custom scripts | `clawteam spawn subprocess python --team ...` | Full support |
 
@@ -270,6 +271,29 @@ openclaw approvals allowlist add --agent "*" "$(which clawteam)"
 
 > If `openclaw approvals` fails, the OpenClaw gateway may not be running. Start it first, then retry.
 
+### Step 5b: Install the Hermes skill (Hermes Agent users only)
+
+The skill file teaches Hermes Agent how to use ClawTeam through natural language -- including when to route to clawteam (vs `delegate_task`), correct spawn flags, and timing expectations. Skip this step if you're not using Hermes.
+
+```bash
+mkdir -p ~/.hermes/skills/openclaw-imports/clawteam
+cp skills/hermes/SKILL.md ~/.hermes/skills/openclaw-imports/clawteam/SKILL.md
+```
+
+> Verify with `hermes skills list | grep clawteam`. The skill should show up under `openclaw-imports` (Hermes auto-routes skills from that directory).
+
+**Key things the skill teaches Hermes:**
+
+- Route multi-agent/swarm/team queries to clawteam (not `delegate_task`)
+- Use `--team-name` (not `--team`), `-g`/`--goal`, `--force` on `launch`
+- Always pass `--command hermes` on `launch` -- templates default to `openclaw`
+- On `spawn`, pass `hermes` as a trailing positional arg (not `--command hermes`)
+- Wait `sleep 60` after launch for worker boot, then poll the board every 30s
+- Never peek inboxes within the first 60s (they'll be empty)
+- Read inboxes and produce a consolidated report before `clawteam team cleanup`
+
+Spawned Hermes workers automatically inherit MCP servers configured in `~/.hermes/config.yaml`, so any knowledge brain or tool setup is available to every worker.
+
 ### Step 6: Verify
 
 ```bash
@@ -349,7 +373,7 @@ A TOML template spawns a complete 7-agent investment team with one command:
 clawteam launch hedge-fund --team fund1 --goal "Analyze AAPL, MSFT, NVDA for Q2 2026"
 ```
 
-5 analyst agents (value, growth, technical, fundamentals, sentiment) work in parallel. Risk manager synthesizes all signals. Portfolio manager makes final decisions.
+Seven agents total: 5 analysts (value, growth, technical, fundamentals, sentiment) work in parallel, a risk manager synthesizes all signals, and a portfolio manager makes the final decision.
 
 Templates are TOML files — **create your own** for any domain.
 
@@ -402,6 +426,7 @@ Templates are TOML files — **create your own** for any domain.
 </table>
 
 ### v0.3.0 — Production Intelligence *(New)*
+- **Hermes Agent Support** — native spawn target across NativeCliAdapter, tmux, and subprocess backends. Auto-inserts `chat` subcommand and passes `--source tool` (session hygiene requires the upstream Hermes patch described in `skills/hermes/SKILL.md` — ClawTeam passes the flag correctly; Hermes ≤ 0.8.0 ignores it).
 - **Cost Dashboard** — real-time token/cost by agent, model, and task (`clawteam board cost`). No competitor has this.
 - **Circuit Breaker** — healthy → degraded → open tri-state with half-open probing
 - **Retry with Backoff** — `spawn_with_retry()` for resilient agent spawning
@@ -460,6 +485,43 @@ Once the skill is installed, talk to your OpenClaw bot in any channel:
 
 ---
 
+## Hermes Agent Integration
+
+ClawTeam ships first-class support for [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Nous Research's self-improving CLI agent. Hermes workers spawn via the same adapter path as OpenClaw (tmux or subprocess), but use Hermes-native command flags (`hermes chat --yolo --source tool -q "<task>"`).
+
+Hermes workers automatically inherit any MCP servers configured in `~/.hermes/config.yaml`, so whatever tools you've wired into Hermes are available to every spawned worker.
+
+| Capability | Hermes Alone | Hermes + ClawTeam |
+|-----------|--------------|-------------------|
+| **Parallelism** | Single session | Spawn N workers in tmux windows |
+| **Coordination** | Manual | Kanban + inboxes + task dependencies |
+| **Isolation** | Shared working dir | Git worktrees per agent |
+| **Session hygiene** | Mixes with user sessions | `--source tool` tag passed to Hermes (requires upstream fix — see SKILL.md `Known upstream issues`) |
+
+**Using Hermes with ClawTeam:**
+
+All built-in templates (`hedge-fund`, `research-paper`, `code-review`, `strategy-room`) default to spawning OpenClaw workers. Hermes users pass `--command hermes` to override:
+
+```bash
+clawteam launch hedge-fund --team-name <name> --goal "..." --command hermes --force
+```
+
+Or spawn manually, passing `hermes` as the trailing positional argument:
+
+```bash
+clawteam spawn --team <team> --agent-name <name> --task "..." --no-workspace hermes
+```
+
+Note: the built-in templates were designed around OpenClaw's `clawteam inbox send` coordination pattern. Hermes workers sometimes complete their analysis without executing the inbox-send command. If `clawteam inbox peek` returns empty while the kanban shows `COMPLETED`, capture tmux scrollback directly:
+
+```bash
+tmux capture-pane -t clawteam-<team>:<window-index> -p -S -500
+```
+
+**Installation:** see Step 5b in the Install section.
+
+---
+
 ## Architecture
 
 ```
@@ -509,9 +571,11 @@ clawteam team discover                    # List all teams
 clawteam team status <team>               # Show members
 clawteam team cleanup <team> --force      # Delete team
 
-# Spawn agents
+# Spawn agents (note: `spawn` uses --team; `launch` uses --team-name)
 clawteam spawn --team <team> --agent-name <name> --task "do this"
 clawteam spawn codex --team <team> --agent-name <name> --task "do this"
+clawteam spawn --team <team> --agent-name <name> --task "do this" hermes
+clawteam spawn subprocess hermes --team <team> --agent-name <name> --task "do this"
 
 # Task management
 clawteam task create <team> "subject" -o <owner> --blocked-by <id1>,<id2>
@@ -630,6 +694,7 @@ Areas we'd love help with:
 
 - [@karpathy/autoresearch](https://github.com/karpathy/autoresearch) — autonomous ML research framework
 - [OpenClaw](https://openclaw.ai) — default agent backend
+- [Hermes Agent](https://github.com/NousResearch/hermes-agent) — Nous Research's self-improving CLI agent
 - [Claude Code](https://claude.ai/claude-code) and [Codex](https://openai.com/codex) — supported AI coding agents
 - [ai-hedge-fund](https://github.com/virattt/ai-hedge-fund) — hedge fund template inspiration
 - [CLI-Anything](https://github.com/HKUDS/CLI-Anything) — sister project

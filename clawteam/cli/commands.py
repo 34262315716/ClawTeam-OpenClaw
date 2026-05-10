@@ -81,9 +81,7 @@ def _output(data: dict | list, human_fn=None):
         print(json.dumps(data, indent=2, ensure_ascii=False))
 
 
-# ============================================================================
 # Config Commands
-# ============================================================================
 
 config_app = typer.Typer(help="Configuration management")
 app.add_typer(config_app, name="config")
@@ -231,9 +229,7 @@ def config_health():
     _output(checks, _human)
 
 
-# ============================================================================
 # Team Commands
-# ============================================================================
 
 team_app = typer.Typer(help="Team management commands")
 app.add_typer(team_app, name="team")
@@ -596,9 +592,7 @@ def team_status(
     _output(data, _human)
 
 
-# ============================================================================
 # Inbox Commands
-# ============================================================================
 
 inbox_app = typer.Typer(help="Inbox / messaging commands")
 app.add_typer(inbox_app, name="inbox")
@@ -820,9 +814,7 @@ def inbox_watch(
     watcher.watch()
 
 
-# ============================================================================
 # Runtime Commands
-# ============================================================================
 
 runtime_app = typer.Typer(help="Tmux-only runtime routing and live injection")
 app.add_typer(runtime_app, name="runtime")
@@ -944,9 +936,7 @@ def runtime_state(
     _output(state, _human)
 
 
-# ============================================================================
 # Task Commands
-# ============================================================================
 
 task_app = typer.Typer(help="Task management commands")
 app.add_typer(task_app, name="task")
@@ -1146,9 +1136,7 @@ def task_stats(
     _output(stats, _human)
 
 
-# ============================================================================
 # Cost Commands
-# ============================================================================
 
 cost_app = typer.Typer(help="Cost tracking and budget management")
 app.add_typer(cost_app, name="cost")
@@ -1454,9 +1442,7 @@ def _print_incomplete_tasks(task_details: list[dict]):
             console.print(f"    [{t['status']}] {t['id']}  {t['subject']}  (owner: {t['owner'] or '-'})")
 
 
-# ============================================================================
 # Session Commands
-# ============================================================================
 
 session_app = typer.Typer(help="Session persistence for agent resume")
 app.add_typer(session_app, name="session")
@@ -1553,9 +1539,7 @@ def session_clear(
         _output({"status": "cleared", "count": count}, lambda d: console.print(f"[green]OK[/green] Cleared {count} session(s)"))
 
 
-# ============================================================================
 # Plan Commands
-# ============================================================================
 
 plan_app = typer.Typer(help="Plan management commands")
 app.add_typer(plan_app, name="plan")
@@ -1639,9 +1623,7 @@ def plan_reject(
     )
 
 
-# ============================================================================
 # Lifecycle Commands
-# ============================================================================
 
 lifecycle_app = typer.Typer(help="Agent lifecycle commands (shutdown protocol)")
 app.add_typer(lifecycle_app, name="lifecycle")
@@ -1941,9 +1923,7 @@ def _resolve_spawn_backend_and_command(
     return backend, normalized_command
 
 
-# ============================================================================
 # Spawn Command
-# ============================================================================
 
 @app.command("spawn")
 def spawn_agent(
@@ -1991,6 +1971,7 @@ def spawn_agent(
         current_count = len(get_registry(_team))
         warning = check_agent_count(current_count, max_agents=DEFAULT_MAX_AGENTS)
         if warning:
+
             error_console.print(f"[yellow]{warning}[/yellow]")
 
     # Resolve skip_permissions from config
@@ -2118,9 +2099,7 @@ def spawn_agent(
     )
 
 
-# ============================================================================
 # Identity Commands
-# ============================================================================
 
 identity_app = typer.Typer(help="Agent identity commands")
 app.add_typer(identity_app, name="identity")
@@ -2185,9 +2164,7 @@ def identity_set(
         console.print(f"\nOr use: eval $(clawteam identity set {' '.join(sys.argv[3:])})")
 
 
-# ============================================================================
 # Board Commands
-# ============================================================================
 
 board_app = typer.Typer(help="Team dashboard and kanban board.")
 app.add_typer(board_app, name="board")
@@ -2299,9 +2276,7 @@ def board_attach(
     console.print(f"[green]OK[/green] {result}")
 
 
-# ============================================================================
 # Workspace Commands
-# ============================================================================
 
 workspace_app = typer.Typer(help="Git worktree workspace management")
 app.add_typer(workspace_app, name="workspace")
@@ -2449,9 +2424,7 @@ def workspace_status(
     console.print(stat)
 
 
-# ============================================================================
 # Template Commands
-# ============================================================================
 
 template_app = typer.Typer(help="Template management")
 app.add_typer(template_app, name="template")
@@ -2523,9 +2496,7 @@ def template_show(
     _output(data, _human)
 
 
-# ============================================================================
 # Launch Command
-# ============================================================================
 
 @app.command("launch")
 def launch_team(
@@ -2564,6 +2535,7 @@ def launch_team(
         total_agents = len(tmpl.agents) + 1  # agents + leader
         warning = check_agent_count(total_agents - 1, tmpl.max_agents)
         if warning:
+
             error_console.print(f"[yellow]{warning}[/yellow]")
 
     # 2. Determine team name
