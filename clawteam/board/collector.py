@@ -78,6 +78,34 @@ class BoardCollector:
         except Exception:
             pass
 
+        # Per-agent task aggregation (for agent-grid view)
+        agents_status: list[dict] = []
+        for m in config.members:
+            agent_tasks = {
+                "in_progress": [],
+                "completed": [],
+                "pending": [],
+                "blocked": [],
+            }
+            for t in all_tasks:
+                if t.owner == m.name:
+                    agent_tasks[t.status.value].append(
+                        json.loads(t.model_dump_json(by_alias=True, exclude_none=True))
+                    )
+            current_task = agent_tasks["in_progress"][0] if agent_tasks["in_progress"] else None
+            agents_status.append({
+                "name": m.name,
+                "agentType": m.agent_type,
+                "alive": is_agent_alive(team_name, m.name),
+                "inboxCount": mailbox.peek_count(
+                    f"{m.user}_{m.name}" if m.user else m.name
+                ),
+                "currentTask": current_task,
+                "completedCount": len(agent_tasks["completed"]),
+                "taskCount": len(agent_tasks["in_progress"]) + len(agent_tasks["completed"])
+                             + len(agent_tasks["pending"]) + len(agent_tasks["blocked"]),
+            })
+
         # Cost summary
         cost_data = {}
         try:
@@ -106,6 +134,7 @@ class BoardCollector:
             "members": members,
             "tasks": grouped,
             "taskSummary": summary,
+            "agents": agents_status,  # per-agent status for agent-grid view
             "messages": all_messages,
             "cost": cost_data,
         }

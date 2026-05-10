@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-_IDENTIFIER_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+_IDENTIFIER_RE = re.compile(r"^[\w.-]+$", re.UNICODE)
 
 
 def validate_identifier(value: str, kind: str = "identifier", allow_empty: bool = False) -> str:
